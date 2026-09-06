@@ -151,6 +151,8 @@ namespace MGA.Playnite
 
             var imported = new List<GameMetadata>(games.Count);
             var skipped = 0;
+            var artworkWanted = 0;
+            var artworkFetched = 0;
             foreach (var game in games)
             {
                 cancelToken.ThrowIfCancellationRequested();
@@ -163,7 +165,7 @@ namespace MGA.Playnite
                 }
                 if (artworkAvailable)
                 {
-                    AttachArtwork(metadata, game, client, cancelToken);
+                    AttachArtwork(metadata, game, client, cancelToken, ref artworkWanted, ref artworkFetched);
                 }
                 imported.Add(metadata);
             }
@@ -171,6 +173,15 @@ namespace MGA.Playnite
             if (skipped > 0)
             {
                 Logger.Warn("Skipped " + skipped + " MGA games that arrived without an id; they cannot be matched on a later refresh.");
+            }
+            if (artworkWanted > artworkFetched)
+            {
+                // Not an error, and worth saying plainly: MGA holds the record
+                // but not the file, so it pointed at the original provider and
+                // this plugin declined to go there. Asking has queued a repair
+                // on the server, so the next sync usually brings the artwork.
+                Logger.Info("MGA supplied " + artworkFetched + " of " + artworkWanted +
+                            " artwork images. The rest are not in MGA's cache yet; asking for them has queued a redownload, so try another library update later.");
             }
             return imported;
         }
@@ -180,25 +191,35 @@ namespace MGA.Playnite
         /// a cosmetic loss, and failing the whole import over one would turn a
         /// missing thumbnail into a library that will not sync.
         /// </summary>
-        private void AttachArtwork(GameMetadata metadata, GameDto game, MgaApiClient client, CancellationToken cancelToken)
+        private void AttachArtwork(
+            GameMetadata metadata,
+            GameDto game,
+            MgaApiClient client,
+            CancellationToken cancelToken,
+            ref int wanted,
+            ref int fetched)
         {
             var coverId = MgaGameMetadataFactory.CoverAssetId(game);
             if (coverId > 0)
             {
+                wanted++;
                 var bytes = TryDownload(client, coverId, cancelToken);
                 if (bytes != null)
                 {
                     metadata.CoverImage = new MetadataFile("mga-cover-" + coverId, bytes);
+                    fetched++;
                 }
             }
 
             var backgroundId = MgaGameMetadataFactory.BackgroundAssetId(game);
             if (backgroundId > 0)
             {
+                wanted++;
                 var bytes = TryDownload(client, backgroundId, cancelToken);
                 if (bytes != null)
                 {
                     metadata.BackgroundImage = new MetadataFile("mga-background-" + backgroundId, bytes);
+                    fetched++;
                 }
             }
         }

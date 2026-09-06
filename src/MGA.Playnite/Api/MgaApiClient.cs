@@ -41,7 +41,24 @@ namespace MGA.Playnite.Api
 
             baseAddress = NormalizeServerUrl(serverUrl);
             this.token = token.Trim();
-            httpClient = handler == null ? new HttpClient() : new HttpClient(handler, true);
+
+            // Redirects are not followed.
+            //
+            // MGA answers a media request with 307 to the original provider
+            // when it has not cached the artwork itself. Following that
+            // silently turns a plugin pointed at a LAN server into one fetching
+            // from IGDB, Steam's CDN and whoever else — slowly, over the
+            // internet, for artwork the user believes is held locally. Measured
+            // on the owner's server, 327 of 505 artwork requests in one import
+            // were such redirects.
+            //
+            // So a redirect is read as "MGA does not have this yet" and the
+            // artwork is skipped. The request still repairs the server's cache
+            // as a side effect, so what is missing on one sync is usually
+            // present on the next.
+            httpClient = handler == null
+                ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }, true)
+                : new HttpClient(handler, true);
 
             // A library sync pulls hundreds of records and artwork over a LAN
             // that may be slow rather than broken. Playnite already runs this on
@@ -148,8 +165,11 @@ namespace MGA.Playnite.Api
             using (var request = CreateRequest(HttpMethod.Get, "/media/" + assetId))
             using (var response = await SendAsync(request, "download artwork", cancelToken).ConfigureAwait(false))
             {
-                if (response.StatusCode == HttpStatusCode.NotFound)
+                if (response.StatusCode == HttpStatusCode.NotFound || IsRedirect(response.StatusCode))
                 {
+                    // Absent, or held only by the original provider. Either way
+                    // MGA cannot give us the bytes, and a game without a cover
+                    // is a normal state rather than a failure.
                     return null;
                 }
                 if (!response.IsSuccessStatusCode)
@@ -188,6 +208,20 @@ namespace MGA.Playnite.Api
                         ex);
                 }
             }
+        }
+
+        /// <summary>
+        /// Whether a status means "the thing you asked for is somewhere else".
+        /// Spelled out rather than inferred from the 3xx range, because 304 Not
+        /// Modified is also 3xx and means the opposite.
+        /// </summary>
+        public static bool IsRedirect(HttpStatusCode status)
+        {
+            return status == HttpStatusCode.MovedPermanently
+                || status == HttpStatusCode.Found
+                || status == HttpStatusCode.SeeOther
+                || status == HttpStatusCode.TemporaryRedirect
+                || (int)status == 308;
         }
 
         private HttpRequestMessage CreateRequest(HttpMethod method, string path)

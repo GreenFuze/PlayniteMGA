@@ -3,6 +3,7 @@ using MGA.Playnite.GameImport;
 using Playnite.SDK.Models;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Linq;
 using static MGA.Playnite.Tests.Harness;
 
@@ -305,6 +306,19 @@ namespace MGA.Playnite.Tests
                 var showing = MgaApiClient.BuildGamesPath(0, 200, hideLapsed: false);
                 AssertTrue(!showing.Contains("hide_lapsed"),
                     "the filter was sent when everything was wanted: " + showing);
+            });
+
+            Test("a redirect is a redirect, but 304 Not Modified is not", () =>
+            {
+                // MGA answers 307 for artwork it has a record of but no file,
+                // pointing at the original provider. Following that would make
+                // a LAN plugin fetch from third parties, so it is treated as
+                // "not available". 304 shares the 3xx range and means the
+                // opposite, so the check is by status, not by range.
+                AssertTrue(MgaApiClient.IsRedirect(HttpStatusCode.TemporaryRedirect), "307 was not recognised as a redirect");
+                AssertTrue(MgaApiClient.IsRedirect(HttpStatusCode.Found), "302 was not recognised as a redirect");
+                AssertTrue(!MgaApiClient.IsRedirect(HttpStatusCode.NotModified), "304 was treated as a redirect");
+                AssertTrue(!MgaApiClient.IsRedirect(HttpStatusCode.OK), "200 was treated as a redirect");
             });
 
             Test("paging is carried on the request, not assumed by the server", () =>
