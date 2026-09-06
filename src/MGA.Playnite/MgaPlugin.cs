@@ -119,7 +119,9 @@ namespace MGA.Playnite
                     throw new Exception(blocked);
                 }
 
-                games = client.GetAllGamesAsync(settings.PageSize, cancelToken).GetAwaiter().GetResult();
+                games = client
+                    .GetAllGamesAsync(settings.PageSize, settings.HideLapsedSubscriptionGames, cancelToken)
+                    .GetAwaiter().GetResult();
 
                 var imported = Project(games, client, capabilities, settings.DownloadArtwork, cancelToken);
 

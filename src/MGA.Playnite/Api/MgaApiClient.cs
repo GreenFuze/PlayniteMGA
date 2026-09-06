@@ -89,7 +89,7 @@ namespace MGA.Playnite.Api
         /// the server's own total, so a server that clamps the page size cannot
         /// send this into an endless loop.
         /// </summary>
-        public async Task<List<GameDto>> GetAllGamesAsync(int pageSize, CancellationToken cancelToken)
+        public async Task<List<GameDto>> GetAllGamesAsync(int pageSize, bool hideLapsed, CancellationToken cancelToken)
         {
             if (pageSize <= 0)
             {
@@ -102,7 +102,7 @@ namespace MGA.Playnite.Api
             {
                 cancelToken.ThrowIfCancellationRequested();
 
-                var path = "/games?page=" + page + "&page_size=" + pageSize;
+                var path = BuildGamesPath(page, pageSize, hideLapsed);
                 var response = await GetAsync<ListGamesResponse>(path, "list your games", cancelToken)
                     .ConfigureAwait(false);
                 if (response?.Games == null || response.Games.Count == 0)
@@ -118,6 +118,24 @@ namespace MGA.Playnite.Api
                 page++;
             }
             return games;
+        }
+
+        /// <summary>
+        /// The request path for one page of games.
+        ///
+        /// Separated so the query can be asserted without a server: the
+        /// difference between sending hide_lapsed and not sending it is the
+        /// difference between a library of games you can start and one padded
+        /// with subscription titles that have lapsed, and a silent typo in a
+        /// query string is invisible until someone counts the games.
+        /// </summary>
+        public static string BuildGamesPath(int page, int pageSize, bool hideLapsed)
+        {
+            var path = "/games?page=" + page + "&page_size=" + pageSize;
+            // Sent only when true. The server treats an absent parameter as
+            // "show everything", so an explicit false would be redundant and
+            // would differ from what the console sends for the same intent.
+            return hideLapsed ? path + "&hide_lapsed=true" : path;
         }
 
         /// <summary>

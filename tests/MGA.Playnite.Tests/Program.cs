@@ -296,6 +296,24 @@ namespace MGA.Playnite.Tests
                 AssertEqual("https", uri.Scheme, "an explicit https address was downgraded");
             });
 
+            Test("the lapsed-subscription filter is sent only when it is wanted", () =>
+            {
+                var hiding = MgaApiClient.BuildGamesPath(0, 200, hideLapsed: true);
+                AssertTrue(hiding.Contains("hide_lapsed=true"),
+                    "the filter was not sent, so lapsed subscription games would be imported anyway: " + hiding);
+
+                var showing = MgaApiClient.BuildGamesPath(0, 200, hideLapsed: false);
+                AssertTrue(!showing.Contains("hide_lapsed"),
+                    "the filter was sent when everything was wanted: " + showing);
+            });
+
+            Test("paging is carried on the request, not assumed by the server", () =>
+            {
+                var path = MgaApiClient.BuildGamesPath(3, 50, hideLapsed: false);
+                AssertTrue(path.Contains("page=3"), "the page number was lost: " + path);
+                AssertTrue(path.Contains("page_size=50"), "the page size was lost: " + path);
+            });
+
             Test("nonsense is refused rather than half-accepted", () =>
             {
                 var refused = false;

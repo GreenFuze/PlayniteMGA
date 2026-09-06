@@ -20,6 +20,7 @@ namespace MGA.Playnite.Settings
         private string serverUrl = string.Empty;
         private int pageSize = 200;
         private bool downloadArtwork = true;
+        private bool hideLapsedSubscriptionGames = true;
 
         /// <summary>
         /// Version of this settings shape. Persisted so a future change can
@@ -47,6 +48,24 @@ namespace MGA.Playnite.Settings
         {
             get { return downloadArtwork; }
             set { SetValue(ref downloadArtwork, value); }
+        }
+
+        /// <summary>
+        /// Leave out games a subscription no longer carries.
+        ///
+        /// A subscription source reports what an account has played, not what it
+        /// owns, so a library built from it includes titles that were tried once
+        /// and cannot be started today without buying them. MGA's own console
+        /// hides them by default and this matches it, so the same library does
+        /// not have two different sizes depending on where it is viewed.
+        ///
+        /// Reversible: turning it off asks the server for everything again, and
+        /// the games return on the next library update.
+        /// </summary>
+        public bool HideLapsedSubscriptionGames
+        {
+            get { return hideLapsedSubscriptionGames; }
+            set { SetValue(ref hideLapsedSubscriptionGames, value); }
         }
     }
 }

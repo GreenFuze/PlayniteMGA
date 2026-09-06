@@ -39,6 +39,12 @@
                       IsChecked="{Binding Settings.DownloadArtwork}"
                       Margin="0,0,0,8" />
 
+            <CheckBox Content="Leave out games a subscription no longer carries"
+                      IsChecked="{Binding Settings.HideLapsedSubscriptionGames}"
+                      Margin="0,0,0,2" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.6" Margin="24,0,0,12"
+                       Text="A subscription lists what an account has played, not what it owns, so it includes games that cannot be started today without buying them. Turning this off brings them back on the next library update." />
+
             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                 <TextBlock Text="Games per request" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <TextBox Text="{Binding Settings.PageSize}" Width="80" />

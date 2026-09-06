@@ -53,11 +53,22 @@ namespace MGA.Playnite.Tests
                     }
 
                     var stopwatch = Stopwatch.StartNew();
-                    var games = client.GetAllGamesAsync(200, CancellationToken.None).GetAwaiter().GetResult();
+                    var games = client.GetAllGamesAsync(200, true, CancellationToken.None).GetAwaiter().GetResult();
                     stopwatch.Stop();
 
                     Console.WriteLine();
                     Console.WriteLine("Read " + games.Count + " games in " + stopwatch.ElapsedMilliseconds + " ms");
+
+                    // Both settings, against the real server, because a query
+                    // parameter the server quietly ignores looks exactly like
+                    // one it honours until someone compares the two answers.
+                    var everything = client.GetAllGamesAsync(200, false, CancellationToken.None).GetAwaiter().GetResult();
+                    Console.WriteLine("  with lapsed subscriptions left out " + games.Count);
+                    Console.WriteLine("  with everything shown              " + everything.Count);
+                    if (everything.Count == games.Count)
+                    {
+                        Console.WriteLine("  (this library has no lapsed subscription games, so the setting changes nothing here)");
+                    }
 
                     // The two properties that decide whether a refresh churns:
                     // every game must be identifiable, and no two may collide.
