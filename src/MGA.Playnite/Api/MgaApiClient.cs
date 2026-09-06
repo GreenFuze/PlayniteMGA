@@ -180,6 +180,46 @@ namespace MGA.Playnite.Api
             }
         }
 
+        // ── Seams for MgaContentClient ────────────────────────────────────
+        //
+        // Content delivery needs the same base address, token and failure
+        // handling but very different request shapes, so it gets the pieces
+        // rather than a second copy of them.
+
+        internal Task<T> GetJsonAsync<T>(string path, string what, CancellationToken cancelToken) where T : class
+        {
+            return GetAsync<T>(path, what, cancelToken);
+        }
+
+        internal async Task<T> PostJsonAsync<T>(string path, string what, CancellationToken cancelToken) where T : class
+        {
+            using (var request = CreateRequest(HttpMethod.Post, path))
+            using (var response = await SendAsync(request, what, cancelToken).ConfigureAwait(false))
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw await FailureAsync(response, what).ConfigureAwait(false);
+                }
+                var body = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+                return Deserialize<T>(body, what);
+            }
+        }
+
+        internal HttpRequestMessage CreateContentRequest(HttpMethod method, string path)
+        {
+            return CreateRequest(method, path);
+        }
+
+        internal Task<HttpResponseMessage> SendContentAsync(HttpRequestMessage request, string what, CancellationToken cancelToken)
+        {
+            return SendAsync(request, what, cancelToken);
+        }
+
+        internal static Task<MgaApiException> ContentFailureAsync(HttpResponseMessage response, string what)
+        {
+            return FailureAsync(response, what);
+        }
+
         private async Task<T> GetAsync<T>(string path, string what, CancellationToken cancelToken) where T : class
         {
             using (var request = CreateRequest(HttpMethod.Get, path))
@@ -191,22 +231,27 @@ namespace MGA.Playnite.Api
                 }
 
                 var body = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-                try
+                return Deserialize<T>(body, what);
+            }
+        }
+
+        private static T Deserialize<T>(byte[] body, string what) where T : class
+        {
+            try
+            {
+                using (var stream = new MemoryStream(body))
                 {
-                    using (var stream = new MemoryStream(body))
-                    {
-                        var serializer = new DataContractJsonSerializer(typeof(T));
-                        return (T)serializer.ReadObject(stream);
-                    }
+                    var serializer = new DataContractJsonSerializer(typeof(T));
+                    return (T)serializer.ReadObject(stream);
                 }
-                catch (Exception ex)
-                {
-                    throw new MgaApiException(
-                        MgaFailure.Malformed,
-                        "MyGamesAnywhere returned a response this version of the plugin could not read while trying to " +
-                        what + ". The server may be newer than the plugin.",
-                        ex);
-                }
+            }
+            catch (Exception ex)
+            {
+                throw new MgaApiException(
+                    MgaFailure.Malformed,
+                    "MyGamesAnywhere returned a response this version of the plugin could not read while trying to " +
+                    what + ". The server may be newer than the plugin.",
+                    ex);
             }
         }
 

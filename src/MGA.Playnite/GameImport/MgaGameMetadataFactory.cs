@@ -71,6 +71,26 @@ namespace MGA.Playnite.GameImport
             }
 
             metadata.Tags = BuildTags(game);
+
+            // A store-backed game gets its store as its play action, because
+            // the store owns installing and launching it. A file-backed game
+            // gets nothing here: its action is created when it is downloaded,
+            // pointing at the file that actually arrived.
+            var route = Install.ContentRoute.For(game);
+            if (route.Kind == Install.ContentRouteKind.Store && !string.IsNullOrWhiteSpace(route.StoreUrl))
+            {
+                metadata.GameActions = new List<GameAction>
+                {
+                    new GameAction
+                    {
+                        Name = route.StoreKind == "steam" ? "Play on Steam" : "Open in the Microsoft Store",
+                        Type = GameActionType.URL,
+                        Path = route.StoreUrl,
+                        IsPlayAction = true
+                    }
+                };
+            }
+
             return metadata;
         }
 

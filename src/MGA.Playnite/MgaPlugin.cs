@@ -1,5 +1,6 @@
 using MGA.Playnite.Api;
 using MGA.Playnite.GameImport;
+using MGA.Playnite.Install;
 using MGA.Playnite.Settings;
 using MGA.Playnite.Storage;
 using Playnite.SDK;
@@ -22,9 +23,10 @@ namespace MGA.Playnite
     /// scoped frontend API, so the games Playnite shows and the games the MGA
     /// console shows cannot drift apart.
     ///
-    /// Slice 1 imports the library. Installing and launching content is slice 2;
-    /// until then games import as not-installed, which is honest — the plugin
-    /// genuinely cannot put bytes on this machine yet.
+    /// Games whose files MGA holds — a drive, a share, a local folder — can be
+    /// downloaded through this plugin. Games that belong to a store are handed
+    /// to that store instead, because it owns installing and launching them and
+    /// MGA holds nothing of theirs but the knowledge that the account has them.
     /// </summary>
     public sealed class MgaPlugin : LibraryPlugin
     {
@@ -35,6 +37,8 @@ namespace MGA.Playnite
         private readonly ProtectedTokenStore tokenStore;
         private readonly MgaGameMetadataFactory metadataFactory;
         private readonly MgaLibraryReconciler reconciler;
+        private readonly InstalledCopyStore installRecords;
+        private readonly InstallableCopyIndex installableCopyIds;
 
         public MgaPlugin(IPlayniteAPI playniteApi)
             : base(playniteApi ?? throw new ArgumentNullException(nameof(playniteApi)))
@@ -45,6 +49,8 @@ namespace MGA.Playnite
                 Path.Combine(GetPluginUserDataPath(), "mga-access.key"),
                 PluginId);
             metadataFactory = new MgaGameMetadataFactory(Name);
+            installRecords = new InstalledCopyStore(Path.Combine(GetPluginUserDataPath(), "installed"));
+            installableCopyIds = new InstallableCopyIndex(Path.Combine(GetPluginUserDataPath(), "installable.json"));
             reconciler = new MgaLibraryReconciler(playniteApi.Database, new MgaLibraryReconciliationPlanner());
             SettingsViewModel = new MgaSettingsViewModel(this, tokenStore);
         }
@@ -71,6 +77,60 @@ namespace MGA.Playnite
         }
 
         public MgaSettingsViewModel SettingsViewModel { get; }
+
+        /// <summary>
+        /// Install is offered only for games whose files MGA can actually hand
+        /// over. A Steam or Xbox title has no install action here at all: its
+        /// store owns installation, and an Install button that cannot install
+        /// is worse than no button.
+        /// </summary>
+        public override IEnumerable<InstallController> GetInstallActions(GetInstallActionsArgs args)
+        {
+            if (args?.Game == null || args.Game.PluginId != PluginId)
+            {
+                yield break;
+            }
+
+            var copyId = installableCopyIds.Get(args.Game.GameId);
+            if (string.IsNullOrWhiteSpace(copyId))
+            {
+                yield break;
+            }
+
+            yield return new MgaInstallController(args.Game, PlayniteApi, CreateInstaller, copyId);
+        }
+
+        public override IEnumerable<UninstallController> GetUninstallActions(GetUninstallActionsArgs args)
+        {
+            if (args?.Game == null || args.Game.PluginId != PluginId)
+            {
+                yield break;
+            }
+
+            yield return new MgaUninstallController(args.Game, PlayniteApi, new MgaContentUninstaller(installRecords));
+        }
+
+        /// <summary>
+        /// Built per install rather than held, because it needs the current
+        /// server address and access key, and both can change in settings
+        /// between one download and the next.
+        /// </summary>
+        private MgaContentInstaller CreateInstaller()
+        {
+            var settings = SettingsViewModel.Settings;
+            var token = tokenStore.Load();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                throw new InvalidOperationException(
+                    "No MyGamesAnywhere access key is stored. Open its settings and paste a key from the MGA console.");
+            }
+
+            var client = new MgaApiClient(settings.ServerUrl, token);
+            return new MgaContentInstaller(
+                new MgaContentClient(client),
+                installRecords,
+                settings.EffectiveInstallRoot(GetPluginUserDataPath()));
+        }
 
         public override ISettings GetSettings(bool firstRunSettings)
         {
@@ -130,6 +190,7 @@ namespace MGA.Playnite
                 // that is the difference between tidying up and deleting
                 // someone's collection.
                 cancelToken.ThrowIfCancellationRequested();
+                RecordInstallableCopies(games);
                 ReconcileQuietly(games);
                 return imported;
             }
@@ -238,6 +299,38 @@ namespace MGA.Playnite
             {
                 Logger.Warn("Could not download MGA artwork asset " + assetId + ": " + ex.Message);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Remembers which games MGA can serve files for, so Playnite can be
+        /// asked whether a game has an install action without a network call
+        /// behind every menu.
+        /// </summary>
+        private void RecordInstallableCopies(List<GameDto> games)
+        {
+            try
+            {
+                var installable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var game in games)
+                {
+                    var gameId = MgaGameIdentity.ToGameId(game == null ? null : game.Id);
+                    if (gameId == null)
+                    {
+                        continue;
+                    }
+                    var route = ContentRoute.For(game);
+                    if (route.Kind == ContentRouteKind.Files)
+                    {
+                        installable[gameId] = route.CopyId;
+                    }
+                }
+                installableCopyIds.Replace(installable);
+                Logger.Info("MGA can supply files for " + installable.Count + " of " + games.Count + " games; the rest belong to a store.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "MGA could not record which games are installable; install actions may be missing until the next library update.");
             }
         }
 

@@ -126,6 +126,20 @@ namespace MGA.Playnite.Api
 
         [DataMember(Name = "source_games")]
         public List<SourceGameDto> SourceGames { get; set; }
+
+        /// <summary>
+        /// The Microsoft Store product this game is, when MGA knows it. Present
+        /// for Xbox records and the only stable handle this plugin has for
+        /// sending someone to the store.
+        /// </summary>
+        [DataMember(Name = "store_product_id")]
+        public string StoreProductId { get; set; }
+
+        [DataMember(Name = "xcloud_available")]
+        public bool XCloudAvailable { get; set; }
+
+        [DataMember(Name = "xcloud_url")]
+        public string XCloudUrl { get; set; }
     }
 
     [DataContract]
@@ -155,6 +169,13 @@ namespace MGA.Playnite.Api
         [DataMember(Name = "plugin_id")]
         public string PluginId { get; set; }
 
+        /// <summary>
+        /// The provider's own id for this game — a Steam appid, an Xbox title
+        /// id. It is what a store URI is built from.
+        /// </summary>
+        [DataMember(Name = "external_id")]
+        public string ExternalId { get; set; }
+
         [DataMember(Name = "integration_label")]
         public string IntegrationLabel { get; set; }
 
@@ -165,16 +186,165 @@ namespace MGA.Playnite.Api
         public string Url { get; set; }
 
         [DataMember(Name = "delivery")]
-        public DeliveryDto Delivery { get; set; }
+        public SourceDeliveryDto Delivery { get; set; }
+    }
+
+    /// <summary>
+    /// How a source game's bytes can be reached, per delivery profile. This is
+    /// a list rather than a single mode: the same copy can be direct for one
+    /// profile and require materialization for another.
+    /// </summary>
+    [DataContract]
+    internal sealed class SourceDeliveryDto
+    {
+        [DataMember(Name = "profiles")]
+        public List<DeliveryProfileDto> Profiles { get; set; }
     }
 
     [DataContract]
-    internal sealed class DeliveryDto
+    internal sealed class DeliveryProfileDto
+    {
+        [DataMember(Name = "profile")]
+        public string Profile { get; set; }
+
+        [DataMember(Name = "mode")]
+        public string Mode { get; set; }
+
+        [DataMember(Name = "prepare_required")]
+        public bool PrepareRequired { get; set; }
+
+        [DataMember(Name = "ready")]
+        public bool Ready { get; set; }
+
+        [DataMember(Name = "root_file_id")]
+        public string RootFileId { get; set; }
+    }
+
+    // ── Content delivery ──────────────────────────────────────────────────
+
+    [DataContract]
+    internal sealed class ManifestDto
+    {
+        [DataMember(Name = "schema_version")]
+        public int SchemaVersion { get; set; }
+
+        [DataMember(Name = "copy_id")]
+        public string CopyId { get; set; }
+
+        [DataMember(Name = "title")]
+        public string Title { get; set; }
+
+        /// <summary>
+        /// Identifies this exact set of files. If it changes between starting a
+        /// download and finishing one, the source moved underneath us and a
+        /// resumed transfer would splice two different versions together.
+        /// </summary>
+        [DataMember(Name = "revision")]
+        public string Revision { get; set; }
+
+        [DataMember(Name = "etag")]
+        public string ETag { get; set; }
+
+        [DataMember(Name = "delivery")]
+        public ManifestDeliveryDto Delivery { get; set; }
+
+        [DataMember(Name = "files")]
+        public List<ManifestFileDto> Files { get; set; }
+    }
+
+    [DataContract]
+    internal sealed class ManifestDeliveryDto
     {
         [DataMember(Name = "mode")]
         public string Mode { get; set; }
 
         [DataMember(Name = "ready")]
         public bool Ready { get; set; }
+
+        [DataMember(Name = "materialization_required")]
+        public bool MaterializationRequired { get; set; }
+    }
+
+    [DataContract]
+    internal sealed class ManifestFileDto
+    {
+        [DataMember(Name = "id")]
+        public string Id { get; set; }
+
+        [DataMember(Name = "relative_path")]
+        public string RelativePath { get; set; }
+
+        [DataMember(Name = "name")]
+        public string Name { get; set; }
+
+        [DataMember(Name = "role")]
+        public string Role { get; set; }
+
+        [DataMember(Name = "kind")]
+        public string Kind { get; set; }
+
+        [DataMember(Name = "length")]
+        public long Length { get; set; }
+
+        [DataMember(Name = "revision")]
+        public string Revision { get; set; }
+
+        [DataMember(Name = "etag")]
+        public string ETag { get; set; }
+
+        /// <summary>
+        /// A content hash, when the source provided one. Usually absent: MGA
+        /// only emits it when a file's stored revision or object id is literally
+        /// a sha256 digest, and no file in a scanned Drive or share carries one.
+        /// Verification therefore rests on length and revision, and a checksum
+        /// is an extra check when it happens to be there.
+        /// </summary>
+        [DataMember(Name = "checksum")]
+        public ChecksumDto Checksum { get; set; }
+    }
+
+    [DataContract]
+    internal sealed class ChecksumDto
+    {
+        [DataMember(Name = "algorithm")]
+        public string Algorithm { get; set; }
+
+        [DataMember(Name = "value")]
+        public string Value { get; set; }
+    }
+
+    [DataContract]
+    internal sealed class PrepareResponseDto
+    {
+        [DataMember(Name = "immediate")]
+        public bool Immediate { get; set; }
+
+        [DataMember(Name = "job")]
+        public MaterializationJobDto Job { get; set; }
+    }
+
+    [DataContract]
+    internal sealed class MaterializationJobDto
+    {
+        [DataMember(Name = "job_id")]
+        public string JobId { get; set; }
+
+        [DataMember(Name = "copy_id")]
+        public string CopyId { get; set; }
+
+        [DataMember(Name = "status")]
+        public string Status { get; set; }
+
+        [DataMember(Name = "message")]
+        public string Message { get; set; }
+
+        [DataMember(Name = "error_code")]
+        public string ErrorCode { get; set; }
+
+        [DataMember(Name = "progress_current")]
+        public int ProgressCurrent { get; set; }
+
+        [DataMember(Name = "progress_total")]
+        public int ProgressTotal { get; set; }
     }
 }

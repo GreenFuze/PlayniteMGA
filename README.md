@@ -19,18 +19,43 @@ MGA's own library, so Playnite and the MGA console cannot drift apart.
   Playnite library.
 - Tells you what your access key can and cannot do before you save it.
 
-## What it does not do yet
+## Installing games
 
-- **Install or download games.** That is the next piece of work. Games import as
-  not-installed, which is honest: the plugin genuinely cannot put bytes on this machine
-  yet.
+Two kinds of game, two different answers.
+
+**Games MGA holds the files for** — a cloud drive, a network share, a local folder — get a
+Playnite **Install** action that downloads them from your server. Downloads resume where
+they left off, report progress, can be cancelled, and are checked against the file lengths
+and revisions the server declared. If the source changes while a download is running, the
+install is refused rather than leaving you with a copy made of two versions.
+
+**Games that belong to a store** — Steam, Xbox — get no Install action at all. MGA holds
+no bytes for them, only the knowledge that your account has them, so the play action opens
+Steam or the Microsoft Store, which own installing and launching them. A button that
+cannot do what it says is worse than no button.
+
+**Uninstalling removes only what this plugin downloaded.** It keeps a record of every file
+it wrote; anything that has changed since — a save, a patch, a mod — is left alone and
+reported. If there is no record, nothing is deleted.
+
+## What it does not do
+
+- **Unpack archives, run installers, or choose emulators.** Those are Playnite's job and
+  the device's, and MGA has never seen this machine. Downloaded files are handed over as
+  they are, with a play action pointing at the executable when there is an obvious one.
 - **Deliver emulators or runtimes.** MGA deliberately does not serve those to a frontend;
   emulator choice and launching stay Playnite's job.
+- **Verify content hashes.** It would if it could. MGA emits a checksum only when a source
+  recorded one as a sha256 digest, and scanned drives and shares do not, so verification
+  rests on length and revision. That catches a truncated transfer and a source that
+  changed; it does not catch silent corruption.
 
 ## Setting it up
 
-1. In the MGA console, open **System** and choose **Issue client**. Give it the
-   `catalog.read` and `metadata.read` permissions. MGA shows the key once — copy it then.
+1. In the MGA console, open **System** and choose **Issue client**. Give it
+   `catalog.read` and `metadata.read` to see your library, and `content.read` plus
+   `content.prepare` as well if you want to download games through Playnite. MGA shows the
+   key once — copy it then.
 2. In Playnite, open **Add-ons → Extensions settings → MyGamesAnywhere**.
 3. Enter your server address (`tv2:8900`, `localhost:8900`, or a full URL) and paste the
    key.
@@ -62,6 +87,13 @@ Run the tests:
 
 ```
 tests\MGA.Playnite.Tests\bin\Debug\net462\MGA.Playnite.Tests.exe
+```
+
+Download and remove one real game, without Playnite, to exercise the install path
+end to end:
+
+```
+tests\MGA.Playnite.Tests\bin\Debug\net462\MGA.Playnite.Tests.exe --install tv2:8900 <key> <copy-id>
 ```
 
 Check a real server without going through Playnite — useful when something is wrong and

@@ -21,6 +21,7 @@ namespace MGA.Playnite.Settings
         private int pageSize = 200;
         private bool downloadArtwork = true;
         private bool hideLapsedSubscriptionGames = true;
+        private string installRoot = string.Empty;
 
         /// <summary>
         /// Version of this settings shape. Persisted so a future change can
@@ -66,6 +67,27 @@ namespace MGA.Playnite.Settings
         {
             get { return hideLapsedSubscriptionGames; }
             set { SetValue(ref hideLapsedSubscriptionGames, value); }
+        }
+
+        /// <summary>
+        /// Where downloaded games are put. Blank means a folder under the
+        /// plugin's own data directory, which is somewhere that always exists
+        /// and is always writable — but games are large, and the disk Playnite
+        /// happens to be installed on is rarely the one with room for them,
+        /// so this is meant to be changed.
+        /// </summary>
+        public string InstallRoot
+        {
+            get { return installRoot; }
+            set { SetValue(ref installRoot, value); }
+        }
+
+        public string EffectiveInstallRoot(string pluginDataPath)
+        {
+            var chosen = (InstallRoot ?? string.Empty).Trim();
+            return chosen.Length > 0
+                ? chosen
+                : System.IO.Path.Combine(pluginDataPath ?? string.Empty, "Games");
         }
     }
 }
