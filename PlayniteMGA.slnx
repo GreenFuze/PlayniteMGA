@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MGA.Playnite/MGA.Playnite.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MGA.Playnite.Tests/MGA.Playnite.Tests.csproj" />
+  </Folder>
+</Solution>

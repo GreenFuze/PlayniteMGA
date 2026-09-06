@@ -1,0 +1,51 @@
+<UserControl x:Class="MGA.Playnite.Settings.MgaSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             d1p1:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:d1p1="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DesignHeight="420" d:DesignWidth="620">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16">
+
+            <TextBlock Text="MyGamesAnywhere server"
+                       FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,0,0,6"
+                       Text="The address of your MGA server, for example tv2:8900 or localhost:8900." />
+            <TextBox Text="{Binding Settings.ServerUrl, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,16" />
+
+            <TextBlock Text="Access key" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,0,0,6"
+                       Text="In the MGA console open System, choose Issue client, and copy the key it shows once. It is stored encrypted for your Windows account and is never shown again here." />
+            <PasswordBox x:Name="AccessKeyBox"
+                         PasswordChanged="AccessKeyBox_PasswordChanged"
+                         Margin="0,0,0,8" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <Button Content="Check connection"
+                        Command="{Binding TestConnectionCommand}"
+                        Padding="12,4" Margin="0,0,8,0" />
+                <Button Content="Forget stored key"
+                        Command="{Binding DisconnectCommand}"
+                        Padding="12,4" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ConnectionStatus}"
+                       TextWrapping="Wrap" Opacity="0.85" Margin="0,0,0,16" />
+
+            <TextBlock Text="Library" FontWeight="Bold" Margin="0,0,0,4" />
+            <CheckBox Content="Download cover art and backgrounds from MGA"
+                      IsChecked="{Binding Settings.DownloadArtwork}"
+                      Margin="0,0,0,8" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Games per request" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBox Text="{Binding Settings.PageSize}" Width="80" />
+            </StackPanel>
+
+            <TextBlock TextWrapping="Wrap" Opacity="0.6" Margin="0,8,0,0"
+                       Text="Games that MyGamesAnywhere stops listing are tagged rather than deleted when they are installed on this machine, so nothing you have downloaded or played is removed without you asking." />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

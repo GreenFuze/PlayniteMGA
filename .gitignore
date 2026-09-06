@@ -1,0 +1,9 @@
+bin/
+obj/
+artifacts/
+*.user
+
+# Access keys are passed as arguments and never stored in the repository, but a
+# stray one costs a revocation, so the shapes are refused outright.
+*.key
+*.pext

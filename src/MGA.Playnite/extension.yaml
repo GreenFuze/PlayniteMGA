@@ -1,0 +1,7 @@
+Id: MGA_02db01ef-50e6-49cd-8460-9ee06d324b74
+Name: MyGamesAnywhere
+Author: GreenFuze
+Version: 0.1.0
+Module: MGA.Playnite.dll
+Type: GameLibrary
+Icon: Resources\mga.png
