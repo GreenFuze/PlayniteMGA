@@ -4,17 +4,19 @@ using Playnite.SDK;
 using Playnite.SDK.Data;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading;
 
 namespace MGA.Playnite.Settings
 {
     /// <summary>
-    /// The settings screen's behaviour.
+    /// The settings screen's behaviour: point at a server, choose a player,
+    /// enter their password, and be connected.
     ///
-    /// The access key is handled apart from the rest of the settings on
-    /// purpose. Playnite persists <see cref="MgaSettings"/> as plain JSON, so
-    /// the key goes to <see cref="ProtectedTokenStore"/> instead, and is only
-    /// ever held here as text the user just typed and has not yet saved.
+    /// Neither the password nor the access key is part of the settings object.
+    /// Playnite writes that to a plain JSON file, and neither belongs there —
+    /// the password is used for one request and discarded, and the key it buys
+    /// goes to <see cref="ProtectedTokenStore"/>.
     /// </summary>
     public sealed class MgaSettingsViewModel : ObservableObject, ISettings
     {
@@ -23,20 +25,22 @@ namespace MGA.Playnite.Settings
 
         private MgaSettings editingClone;
         private MgaSettings settings;
-        private string pendingAccessKey = string.Empty;
-        private bool pendingDisconnect;
+        private string password = string.Empty;
+        private ProfileDto selectedProfile;
         private bool busy;
         private string connectionStatus;
+        private bool pendingDisconnect;
+        private string pendingToken;
 
-        // Internal because it takes the token store, which is internal. The
-        // class itself is public only because Playnite binds a view to it.
         internal MgaSettingsViewModel(MgaPlugin plugin, ProtectedTokenStore tokenStore)
         {
             this.plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             this.tokenStore = tokenStore ?? throw new ArgumentNullException(nameof(tokenStore));
 
             Settings = plugin.LoadPluginSettings<MgaSettings>() ?? new MgaSettings();
-            TestConnectionCommand = new RelayCommand(() => TestConnection(), () => !Busy);
+            Profiles = new ObservableCollection<ProfileDto>();
+            LoadProfilesCommand = new RelayCommand(() => LoadProfiles(), () => !Busy);
+            SignInCommand = new RelayCommand(() => SignIn(), () => !Busy);
             DisconnectCommand = new RelayCommand(() => Disconnect(), () => !Busy);
             RefreshStatus();
         }
@@ -47,15 +51,22 @@ namespace MGA.Playnite.Settings
             private set { SetValue(ref settings, value); }
         }
 
-        /// <summary>
-        /// The key as typed. Write-only from the view's perspective: once saved
-        /// it is never read back out for display, because an access key shown on
-        /// screen is an access key in a screenshot.
-        /// </summary>
-        public string PendingAccessKey
+        public ObservableCollection<ProfileDto> Profiles { get; }
+
+        public ProfileDto SelectedProfile
         {
-            get { return pendingAccessKey; }
-            set { SetValue(ref pendingAccessKey, value); }
+            get { return selectedProfile; }
+            set { SetValue(ref selectedProfile, value); }
+        }
+
+        /// <summary>
+        /// Held only until the sign-in request is made, then cleared. It is
+        /// never written anywhere.
+        /// </summary>
+        public string Password
+        {
+            get { return password; }
+            set { SetValue(ref password, value); }
         }
 
         public bool Busy
@@ -70,42 +81,47 @@ namespace MGA.Playnite.Settings
             private set { SetValue(ref connectionStatus, value); }
         }
 
-        public RelayCommand TestConnectionCommand { get; }
+        public RelayCommand LoadProfilesCommand { get; }
+
+        public RelayCommand SignInCommand { get; }
 
         public RelayCommand DisconnectCommand { get; }
 
         public void BeginEdit()
         {
             editingClone = Serialization.GetClone(Settings);
-            PendingAccessKey = string.Empty;
+            Password = string.Empty;
             pendingDisconnect = false;
+            pendingToken = null;
             RefreshStatus();
         }
 
         public void CancelEdit()
         {
             Settings = editingClone ?? new MgaSettings();
-            PendingAccessKey = string.Empty;
+            Password = string.Empty;
             pendingDisconnect = false;
+            pendingToken = null;
             RefreshStatus();
         }
 
         public void EndEdit()
         {
-            // Order matters: a disconnect requested in this session is applied
-            // before a newly typed key is stored, so "disconnect, then paste a
-            // new key" ends connected rather than empty.
+            // A disconnect requested in this session is applied before a key
+            // obtained in it, so "disconnect, then sign in again" ends
+            // connected rather than empty.
             if (pendingDisconnect)
             {
                 tokenStore.Clear();
                 pendingDisconnect = false;
             }
-            if (!string.IsNullOrWhiteSpace(PendingAccessKey))
+            if (!string.IsNullOrWhiteSpace(pendingToken))
             {
-                tokenStore.Save(PendingAccessKey);
+                tokenStore.Save(pendingToken);
+                pendingToken = null;
             }
 
-            PendingAccessKey = string.Empty;
+            Password = string.Empty;
             plugin.SavePluginSettings(Settings);
             plugin.OnSettingsChanged();
             RefreshStatus();
@@ -124,39 +140,49 @@ namespace MGA.Playnite.Settings
                 errors.Add(ex.Message);
             }
 
-            var willHaveKey = !string.IsNullOrWhiteSpace(PendingAccessKey) ||
+            var willHaveKey = !string.IsNullOrWhiteSpace(pendingToken) ||
                               (!pendingDisconnect && tokenStore.Exists);
             if (!willHaveKey)
             {
-                errors.Add("Paste an access key from the MyGamesAnywhere console (System → Issue client).");
+                errors.Add("Choose a player and sign in before saving.");
             }
 
             return errors.Count == 0;
         }
 
         /// <summary>
-        /// Asks the server what this key can do, and says so. Run before saving
-        /// so a key is proven while the user is still looking at the field they
-        /// pasted it into, rather than failing later during a library refresh.
+        /// Asks the server who can sign in. Deliberately a separate step from
+        /// signing in: the list tells the user their server address is right
+        /// before they are asked to type a password into it.
         /// </summary>
-        private void TestConnection()
+        private void LoadProfiles()
         {
-            var key = !string.IsNullOrWhiteSpace(PendingAccessKey) ? PendingAccessKey : tokenStore.Load();
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                ConnectionStatus = "Paste an access key first.";
-                return;
-            }
-
             Busy = true;
-            ConnectionStatus = "Checking…";
+            ConnectionStatus = "Looking for players…";
             try
             {
-                using (var client = new MgaApiClient(Settings.ServerUrl, key))
+                using (var signIn = new MgaSignIn(Settings.ServerUrl))
                 {
-                    var response = client.GetCapabilitiesAsync(CancellationToken.None).GetAwaiter().GetResult();
-                    var capabilities = NegotiatedCapabilities.From(response);
-                    ConnectionStatus = Describe(capabilities);
+                    var found = signIn.ListProfilesAsync(CancellationToken.None).GetAwaiter().GetResult();
+                    Profiles.Clear();
+                    foreach (var profile in found)
+                    {
+                        if (profile != null && !string.IsNullOrWhiteSpace(profile.Id))
+                        {
+                            Profiles.Add(profile);
+                        }
+                    }
+
+                    if (Profiles.Count == 0)
+                    {
+                        ConnectionStatus = "That server has no players to sign in as.";
+                        return;
+                    }
+                    if (Profiles.Count == 1)
+                    {
+                        SelectedProfile = Profiles[0];
+                    }
+                    ConnectionStatus = "Choose a player and enter their password.";
                 }
             }
             catch (MgaApiException ex)
@@ -165,7 +191,7 @@ namespace MGA.Playnite.Settings
             }
             catch (Exception ex)
             {
-                ConnectionStatus = "Could not check this connection: " + ex.Message;
+                ConnectionStatus = "Could not read the list of players: " + ex.Message;
             }
             finally
             {
@@ -173,34 +199,86 @@ namespace MGA.Playnite.Settings
             }
         }
 
-        private static string Describe(NegotiatedCapabilities capabilities)
+        private void SignIn()
         {
-            var library = capabilities.Has(NegotiatedCapabilities.CatalogProjection)
-                ? "can read your library"
-                : "cannot read your library";
-            var artwork = capabilities.Has(NegotiatedCapabilities.MetadataMedia)
-                ? "can download artwork"
-                : "cannot download artwork";
+            var profile = SelectedProfile;
+            if (profile == null)
+            {
+                ConnectionStatus = "Choose a player first.";
+                return;
+            }
 
-            var summary = "Connected to " + (capabilities.ClientName ?? "MyGamesAnywhere") +
-                          " (API " + (capabilities.ApiVersion ?? "v1") + "): " + library + ", " + artwork + ".";
+            Busy = true;
+            ConnectionStatus = "Signing in…";
+            try
+            {
+                using (var signIn = new MgaSignIn(Settings.ServerUrl))
+                {
+                    var issued = signIn
+                        .SignInAsync(profile.Id, Password, MgaSignIn.SuggestClientName(), CancellationToken.None)
+                        .GetAwaiter().GetResult();
 
-            var blocking = capabilities.BlockingReason();
-            return blocking == null ? summary : summary + " " + blocking;
+                    // Held until Save, so cancelling the settings dialog leaves
+                    // the previous connection exactly as it was.
+                    pendingToken = issued.Token;
+                    pendingDisconnect = false;
+                    Password = string.Empty;
+                    Settings.ProfileDisplayName = profile.DisplayName;
+
+                    ConnectionStatus = "Signed in as " + profile + ". Save to finish connecting" +
+                        DescribeScopes(issued) + ".";
+                }
+            }
+            catch (MgaApiException ex)
+            {
+                ConnectionStatus = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                ConnectionStatus = "Could not sign in: " + ex.Message;
+            }
+            finally
+            {
+                Busy = false;
+            }
+        }
+
+        /// <summary>
+        /// Says what the key can do, because the answer is not always what the
+        /// user expects: an older server may issue fewer permissions than this
+        /// version of the plugin can use.
+        /// </summary>
+        private static string DescribeScopes(IssuedClientDto issued)
+        {
+            if (issued.Scopes == null || issued.Scopes.Count == 0)
+            {
+                return string.Empty;
+            }
+            var canInstall = issued.Scopes.Contains("content.read");
+            return canInstall
+                ? ". This connection can read your library and download games"
+                : ". This connection can read your library, but not download games";
         }
 
         private void Disconnect()
         {
             pendingDisconnect = true;
-            PendingAccessKey = string.Empty;
-            ConnectionStatus = "The stored access key will be removed when you save.";
+            pendingToken = null;
+            Password = string.Empty;
+            Settings.ProfileDisplayName = string.Empty;
+            ConnectionStatus = "The stored connection will be removed when you save.";
         }
 
         private void RefreshStatus()
         {
-            ConnectionStatus = tokenStore.Exists
-                ? "An access key is stored for this server."
-                : "No access key stored yet.";
+            if (!tokenStore.Exists)
+            {
+                ConnectionStatus = "Not connected yet. Enter your server address, then look up its players.";
+                return;
+            }
+            ConnectionStatus = string.IsNullOrWhiteSpace(Settings.ProfileDisplayName)
+                ? "Connected."
+                : "Connected as " + Settings.ProfileDisplayName + ".";
         }
     }
 }

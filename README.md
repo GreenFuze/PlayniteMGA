@@ -52,18 +52,19 @@ reported. If there is no record, nothing is deleted.
 
 ## Setting it up
 
-1. In the MGA console, open **System** and choose **Issue client**. Give it
-   `catalog.read` and `metadata.read` to see your library, and `content.read` plus
-   `content.prepare` as well if you want to download games through Playnite. MGA shows the
-   key once — copy it then.
-2. In Playnite, open **Add-ons → Extensions settings → MyGamesAnywhere**.
-3. Enter your server address (`tv2:8900`, `localhost:8900`, or a full URL) and paste the
-   key.
-4. Press **Check connection**. It will tell you exactly what the key can do.
-5. Save, then **Update game library**.
+1. In Playnite, open **Add-ons → Extensions settings → MyGamesAnywhere**.
+2. Enter your server address (`tv2:8900`, `localhost:8900`, or a full URL) and press
+   **Find players**.
+3. Choose your player, type its password, and press **Sign in**.
+4. Save, then **Update game library**.
 
-The key is stored encrypted for your Windows account, not in Playnite's settings file,
-and is never shown again.
+Playnite never keeps your password. The server exchanges it once for an access key that
+can read your library, fetch its artwork and download your games — and nothing else. The
+key is stored encrypted for your Windows account, not in Playnite's settings file, and you
+can revoke it from the MGA console at any time without changing your password.
+
+If your server is older than this flow, the plugin says so and you can still issue a key
+by hand from the console's **System → Issue client**.
 
 ## What happens when a game disappears from MGA
 

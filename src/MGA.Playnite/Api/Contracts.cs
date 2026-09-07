@@ -66,6 +66,68 @@ namespace MGA.Playnite.Api
         public string Scope { get; set; }
     }
 
+    /// <summary>
+    /// A profile as the picker shows it, from the server's unauthenticated
+    /// profile list. It carries only identity — no credential material — which
+    /// is what makes it safe to read before anyone has signed in.
+    /// </summary>
+    // Public because the settings screen binds a list of these to a combo box,
+    // and WPF cannot reach an internal type from a public view model. It is the
+    // only contract here that a user ever sees.
+    [DataContract]
+    public sealed class ProfileDto
+    {
+        [DataMember(Name = "id")]
+        public string Id { get; set; }
+
+        [DataMember(Name = "display_name")]
+        public string DisplayName { get; set; }
+
+        [DataMember(Name = "role")]
+        public string Role { get; set; }
+
+        public override string ToString()
+        {
+            return string.IsNullOrWhiteSpace(DisplayName) ? Id : DisplayName;
+        }
+    }
+
+    [DataContract]
+    internal sealed class SignInRequest
+    {
+        [DataMember(Name = "profile_id")]
+        public string ProfileId { get; set; }
+
+        [DataMember(Name = "credential")]
+        public string Credential { get; set; }
+
+        [DataMember(Name = "name")]
+        public string Name { get; set; }
+    }
+
+    /// <summary>
+    /// The key the server issues in exchange for a profile password. The token
+    /// is shown once and never again, so it is stored immediately.
+    /// </summary>
+    [DataContract]
+    internal sealed class IssuedClientDto
+    {
+        [DataMember(Name = "id")]
+        public string Id { get; set; }
+
+        [DataMember(Name = "profile_id")]
+        public string ProfileId { get; set; }
+
+        [DataMember(Name = "name")]
+        public string Name { get; set; }
+
+        [DataMember(Name = "scopes")]
+        public List<string> Scopes { get; set; }
+
+        [DataMember(Name = "token")]
+        public string Token { get; set; }
+    }
+
     [DataContract]
     internal sealed class ListGamesResponse
     {

@@ -4,38 +4,48 @@
              d1p1:Ignorable="d"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:d1p1="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             d:DesignHeight="420" d:DesignWidth="620">
+             d:DesignHeight="520" d:DesignWidth="620">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="16">
 
-            <TextBlock Text="MyGamesAnywhere server"
+            <TextBlock Text="1. Your MyGamesAnywhere server"
                        FontWeight="Bold" Margin="0,0,0,4" />
             <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,0,0,6"
-                       Text="The address of your MGA server, for example tv2:8900 or localhost:8900." />
-            <TextBox Text="{Binding Settings.ServerUrl, UpdateSourceTrigger=PropertyChanged}"
-                     Margin="0,0,0,16" />
+                       Text="For example tv2:8900 or localhost:8900." />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <TextBox Text="{Binding Settings.ServerUrl, UpdateSourceTrigger=PropertyChanged}"
+                         Width="360" Margin="0,0,8,0" />
+                <Button Content="Find players"
+                        Command="{Binding LoadProfilesCommand}"
+                        Padding="12,4" />
+            </StackPanel>
 
-            <TextBlock Text="Access key" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBlock Text="2. Sign in" FontWeight="Bold" Margin="0,0,0,4" />
             <TextBlock TextWrapping="Wrap" Opacity="0.75" Margin="0,0,0,6"
-                       Text="In the MGA console open System, choose Issue client, and copy the key it shows once. It is stored encrypted for your Windows account and is never shown again here." />
-            <PasswordBox x:Name="AccessKeyBox"
-                         PasswordChanged="AccessKeyBox_PasswordChanged"
-                         Margin="0,0,0,8" />
+                       Text="Choose your player and enter its password. Playnite does not keep the password: the server exchanges it for an access key that can only read your library and download your games, and you can revoke that key from the MGA console at any time." />
 
             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <Button Content="Check connection"
-                        Command="{Binding TestConnectionCommand}"
-                        Padding="12,4" Margin="0,0,8,0" />
-                <Button Content="Forget stored key"
-                        Command="{Binding DisconnectCommand}"
+                <ComboBox ItemsSource="{Binding Profiles}"
+                          SelectedItem="{Binding SelectedProfile}"
+                          DisplayMemberPath="DisplayName"
+                          Width="240" Margin="0,0,8,0" />
+                <PasswordBox x:Name="PasswordBox"
+                             PasswordChanged="PasswordBox_PasswordChanged"
+                             Width="180" Margin="0,0,8,0" />
+                <Button Content="Sign in"
+                        Command="{Binding SignInCommand}"
                         Padding="12,4" />
             </StackPanel>
 
             <TextBlock Text="{Binding ConnectionStatus}"
-                       TextWrapping="Wrap" Opacity="0.85" Margin="0,0,0,16" />
+                       TextWrapping="Wrap" Opacity="0.85" Margin="0,0,0,8" />
+
+            <Button Content="Disconnect"
+                    Command="{Binding DisconnectCommand}"
+                    HorizontalAlignment="Left" Padding="12,4" Margin="0,0,0,16" />
 
             <TextBlock Text="Library" FontWeight="Bold" Margin="0,0,0,4" />
-            <CheckBox Content="Download cover art and backgrounds from MGA"
+            <CheckBox Content="Download cover art, icons and backgrounds from MGA"
                       IsChecked="{Binding Settings.DownloadArtwork}"
                       Margin="0,0,0,8" />
 

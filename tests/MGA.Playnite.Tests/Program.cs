@@ -20,6 +20,14 @@ namespace MGA.Playnite.Tests
             // The unit tests must stay hermetic, so talking to a real server is
             // an explicit, separate mode rather than something the suite does
             // when a server happens to be reachable.
+            if (args != null && args.Length > 0 && args[0] == "--signin")
+            {
+                return SignInCheck.Run(
+                    args.Length > 1 ? args[1] : null,
+                    args.Length > 2 ? args[2] : null,
+                    args.Length > 3 ? args[3] : null);
+            }
+
             if (args != null && args.Length > 0 && args[0] == "--install")
             {
                 return InstallCheck.Run(

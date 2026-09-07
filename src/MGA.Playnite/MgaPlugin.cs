@@ -122,7 +122,7 @@ namespace MGA.Playnite
             if (string.IsNullOrWhiteSpace(token))
             {
                 throw new InvalidOperationException(
-                    "No MyGamesAnywhere access key is stored. Open its settings and paste a key from the MGA console.");
+                    "Playnite is not signed in to MyGamesAnywhere. Open its settings and sign in as one of your server's players.");
             }
 
             var client = new MgaApiClient(settings.ServerUrl, token);
@@ -156,14 +156,14 @@ namespace MGA.Playnite
             if (string.IsNullOrWhiteSpace(settings.ServerUrl))
             {
                 throw new Exception(
-                    "MyGamesAnywhere is not configured yet. Open its settings and enter your server address and access key.");
+                    "MyGamesAnywhere is not set up yet. Open its settings, enter your server address, and sign in as one of its players.");
             }
 
             var token = tokenStore.Load();
             if (string.IsNullOrWhiteSpace(token))
             {
                 throw new Exception(
-                    "No MyGamesAnywhere access key is stored. Open its settings and paste a key from the MGA console (System → Issue client).");
+                    "Playnite is not signed in to MyGamesAnywhere. Open its settings, find the players on your server, and sign in as one of them.");
             }
 
             List<GameDto> games;

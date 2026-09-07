@@ -22,6 +22,7 @@ namespace MGA.Playnite.Settings
         private bool downloadArtwork = true;
         private bool hideLapsedSubscriptionGames = true;
         private string installRoot = string.Empty;
+        private string profileDisplayName = string.Empty;
 
         /// <summary>
         /// Version of this settings shape. Persisted so a future change can
@@ -76,6 +77,17 @@ namespace MGA.Playnite.Settings
         /// happens to be installed on is rarely the one with room for them,
         /// so this is meant to be changed.
         /// </summary>
+        /// <summary>
+        /// Which player this connection is signed in as, kept only so the
+        /// settings screen can say so. The key itself is stored encrypted
+        /// elsewhere; this is a label, not a credential.
+        /// </summary>
+        public string ProfileDisplayName
+        {
+            get { return profileDisplayName; }
+            set { SetValue(ref profileDisplayName, value); }
+        }
+
         public string InstallRoot
         {
             get { return installRoot; }
