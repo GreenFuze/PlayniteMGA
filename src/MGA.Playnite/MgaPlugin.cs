@@ -190,6 +190,7 @@ namespace MGA.Playnite
                 // that is the difference between tidying up and deleting
                 // someone's collection.
                 cancelToken.ThrowIfCancellationRequested();
+                BackfillArtworkQuietly(games, client, capabilities, settings.DownloadArtwork, cancelToken);
                 RecordInstallableCopies(games);
                 ReconcileQuietly(games);
                 return imported;
@@ -272,6 +273,18 @@ namespace MGA.Playnite
                 }
             }
 
+            var iconId = MgaGameMetadataFactory.IconAssetId(game);
+            if (iconId > 0)
+            {
+                wanted++;
+                var bytes = TryDownload(client, iconId, cancelToken);
+                if (bytes != null)
+                {
+                    metadata.Icon = new MetadataFile("mga-icon-" + iconId, bytes);
+                    fetched++;
+                }
+            }
+
             var backgroundId = MgaGameMetadataFactory.BackgroundAssetId(game);
             if (backgroundId > 0)
             {
@@ -299,6 +312,162 @@ namespace MGA.Playnite
             {
                 Logger.Warn("Could not download MGA artwork asset " + assetId + ": " + ex.Message);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Fills in artwork for games Playnite already had.
+        ///
+        /// Playnite applies a library plugin's metadata only to games it is
+        /// adding. A game already in the database keeps what it has, which is
+        /// how a user's own choices survive a library update — but it also
+        /// means artwork the plugin could not supply the first time never
+        /// arrives, however often the library is refreshed.
+        ///
+        /// Both happened here: icons were added to this plugin after the
+        /// library existed, and the first import lost 327 covers to redirects
+        /// it declined to follow. Neither would ever be repaired by a refresh.
+        ///
+        /// Empty slots only. A cover the user picked is theirs.
+        /// </summary>
+        private void BackfillArtworkQuietly(
+            List<GameDto> games,
+            MgaApiClient client,
+            NegotiatedCapabilities capabilities,
+            bool wantArtwork,
+            CancellationToken cancelToken)
+        {
+            if (!wantArtwork || !capabilities.Has(NegotiatedCapabilities.MetadataMedia))
+            {
+                return;
+            }
+
+            try
+            {
+                var existing = new Dictionary<string, Game>(StringComparer.OrdinalIgnoreCase);
+                foreach (var game in PlayniteApi.Database.Games)
+                {
+                    if (game == null || game.PluginId != PluginId)
+                    {
+                        continue;
+                    }
+                    var key = MgaGameIdentity.ToCanonicalGameId(game.GameId);
+                    if (key != null)
+                    {
+                        existing[key] = game;
+                    }
+                }
+                if (existing.Count == 0)
+                {
+                    return;
+                }
+
+                var filled = 0;
+                foreach (var dto in games)
+                {
+                    cancelToken.ThrowIfCancellationRequested();
+
+                    var key = MgaGameIdentity.ToCanonicalGameId(dto == null ? null : dto.Id);
+                    Game game;
+                    if (key == null || !existing.TryGetValue(key, out game))
+                    {
+                        continue;
+                    }
+
+                    var slots = ArtworkBackfill.Missing(
+                        game.Icon,
+                        game.CoverImage,
+                        game.BackgroundImage,
+                        MgaGameMetadataFactory.IconAssetId(dto),
+                        MgaGameMetadataFactory.CoverAssetId(dto),
+                        MgaGameMetadataFactory.BackgroundAssetId(dto));
+                    if (slots.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var changed = false;
+                    foreach (var slot in slots)
+                    {
+                        var stored = StoreArtwork(game, slot, client, cancelToken);
+                        if (stored == null)
+                        {
+                            continue;
+                        }
+                        if (slot.Kind == ArtworkKind.Icon)
+                        {
+                            game.Icon = stored;
+                        }
+                        else if (slot.Kind == ArtworkKind.Cover)
+                        {
+                            game.CoverImage = stored;
+                        }
+                        else
+                        {
+                            game.BackgroundImage = stored;
+                        }
+                        changed = true;
+                        filled++;
+                    }
+
+                    if (changed)
+                    {
+                        PlayniteApi.Database.Games.Update(game);
+                    }
+                }
+
+                if (filled > 0)
+                {
+                    Logger.Info("MGA filled in " + filled + " missing images on games Playnite already had.");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "MGA could not fill in missing artwork; the library itself is unaffected.");
+            }
+        }
+
+        /// <summary>
+        /// Playnite stores images by path rather than by bytes, so the image
+        /// goes to a temporary file first and is deleted once Playnite has
+        /// copied it into its own storage.
+        /// </summary>
+        private string StoreArtwork(Game game, ArtworkSlot slot, MgaApiClient client, CancellationToken cancelToken)
+        {
+            var bytes = TryDownload(client, slot.AssetId, cancelToken);
+            if (bytes == null || bytes.Length == 0)
+            {
+                return null;
+            }
+
+            var temp = Path.Combine(Path.GetTempPath(), slot.FileName(".png"));
+            try
+            {
+                File.WriteAllBytes(temp, bytes);
+                return PlayniteApi.Database.AddFile(temp, game.Id);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Could not store MGA artwork asset " + slot.AssetId + ": " + ex.Message);
+                return null;
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(temp))
+                    {
+                        File.Delete(temp);
+                    }
+                }
+                catch (Exception)
+                {
+                    // A stray temporary file is not worth failing a sync over.
+                }
             }
         }
 

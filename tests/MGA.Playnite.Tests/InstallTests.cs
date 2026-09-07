@@ -1,4 +1,5 @@
 using MGA.Playnite.Api;
+using MGA.Playnite.GameImport;
 using MGA.Playnite.Install;
 using System;
 using System.Collections.Generic;
@@ -21,6 +22,10 @@ namespace MGA.Playnite.Tests
             Console.WriteLine();
             Console.WriteLine("Uninstall — what may be deleted");
             UninstallTests();
+
+            Console.WriteLine();
+            Console.WriteLine("Artwork backfill — repairing what a refresh never would");
+            BackfillTests();
         }
 
         // ── Routing ───────────────────────────────────────────────────────
@@ -287,6 +292,58 @@ namespace MGA.Playnite.Tests
                     AssertEqual("rev-1", loaded.ManifestRevision, "the manifest revision was lost");
                     AssertEqual(42L, loaded.TotalBytes, "the recorded size was lost");
                 }
+            });
+        }
+
+        // ── Artwork backfill ──────────────────────────────────────────────
+
+        private static void BackfillTests()
+        {
+            Test("a game missing an icon gets one", () =>
+            {
+                var slots = ArtworkBackfill.Missing(
+                    currentIconId: null, currentCoverId: "cover-file", currentBackgroundId: "bg-file",
+                    offeredIconAssetId: 5, offeredCoverAssetId: 6, offeredBackgroundAssetId: 7);
+
+                AssertEqual(1, slots.Count, "more than the missing icon was filled");
+                AssertEqual(ArtworkKind.Icon, slots[0].Kind, "the wrong slot was filled");
+                AssertEqual(5, slots[0].AssetId, "the wrong asset was chosen");
+            });
+
+            Test("artwork the user already has is never replaced", () =>
+            {
+                // Repairing omissions is the point. Overwriting a cover someone
+                // chose, or another plugin supplied, would be this plugin
+                // imposing its opinion on a library it does not own.
+                var slots = ArtworkBackfill.Missing(
+                    currentIconId: "icon-file", currentCoverId: "cover-file", currentBackgroundId: "bg-file",
+                    offeredIconAssetId: 5, offeredCoverAssetId: 6, offeredBackgroundAssetId: 7);
+
+                AssertEqual(0, slots.Count, "existing artwork was overwritten");
+            });
+
+            Test("nothing is filled when MGA has nothing to offer", () =>
+            {
+                var slots = ArtworkBackfill.Missing(null, null, null, 0, 0, 0);
+                AssertEqual(0, slots.Count, "a slot was filled with no asset behind it");
+            });
+
+            Test("an empty string counts as missing, not as an image", () =>
+            {
+                // Playnite clears an image slot to null or to empty, depending
+                // on how it was cleared. Treating "" as an image would leave
+                // those games permanently blank.
+                AssertTrue(ArtworkBackfill.IsMissing(""), "an empty string was treated as an existing image");
+                AssertTrue(ArtworkBackfill.IsMissing("   "), "whitespace was treated as an existing image");
+                AssertTrue(!ArtworkBackfill.IsMissing("file-id"), "a real image was treated as missing");
+            });
+
+            Test("the temporary file keeps an extension Playnite can read", () =>
+            {
+                var slot = new ArtworkSlot(ArtworkKind.Cover, 42);
+                AssertTrue(slot.FileName(".png").EndsWith(".png"), "the extension was lost: " + slot.FileName(".png"));
+                AssertTrue(slot.FileName("png").EndsWith(".png"), "a bare extension was not normalised: " + slot.FileName("png"));
+                AssertTrue(slot.FileName(null).EndsWith(".png"), "a missing extension left the file unreadable");
             });
         }
 

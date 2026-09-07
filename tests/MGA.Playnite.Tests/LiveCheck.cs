@@ -86,6 +86,14 @@ namespace MGA.Playnite.Tests
                     var projected = games.Select(factory.Create).Where(metadata => metadata != null).ToList();
                     Console.WriteLine("  importable records    " + projected.Count);
                     Console.WriteLine("  with a cover          " + games.Count(g => MgaGameMetadataFactory.CoverAssetId(g) > 0));
+                    Console.WriteLine("  with an icon          " + games.Count(g => MgaGameMetadataFactory.IconAssetId(g) > 0));
+                    var mediaTypes = games
+                        .SelectMany(g => g.Media ?? new System.Collections.Generic.List<MediaDto>())
+                        .Where(m => m != null)
+                        .GroupBy(m => m.Type ?? "(none)")
+                        .OrderByDescending(group => group.Count());
+                    Console.WriteLine("  media types seen      " +
+                        string.Join(", ", mediaTypes.Select(group => group.Key + "=" + group.Count())));
 
                     var withCover = games.FirstOrDefault(g => MgaGameMetadataFactory.CoverAssetId(g) > 0);
                     if (withCover != null && capabilities.Has(NegotiatedCapabilities.MetadataMedia))

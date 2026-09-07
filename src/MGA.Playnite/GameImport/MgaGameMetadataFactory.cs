@@ -112,6 +112,29 @@ namespace MGA.Playnite.GameImport
             return FirstAssetOfType(game.Media, "cover");
         }
 
+        /// <summary>
+        /// The small image Playnite shows beside a game in list views.
+        ///
+        /// MGA distinguishes an icon from a logo, and most games have only the
+        /// latter: measured on the owner's library, 119 games carry an icon and
+        /// 222 a logo, but 239 carry one or the other. So a logo stands in when
+        /// there is no icon — it is the right shape and the right subject.
+        ///
+        /// The cover is deliberately not a fallback. Playnite already shows it
+        /// as the cover, and reusing tall box art as the icon makes every list
+        /// row a second copy of the same picture.
+        /// </summary>
+        public static int IconAssetId(GameDto game)
+        {
+            if (game == null)
+            {
+                return 0;
+            }
+
+            var icon = FirstAssetOfType(game.Media, "icon");
+            return icon > 0 ? icon : FirstAssetOfType(game.Media, "logo");
+        }
+
         public static int BackgroundAssetId(GameDto game)
         {
             if (game == null)

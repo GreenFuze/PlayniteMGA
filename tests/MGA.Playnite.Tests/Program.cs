@@ -239,6 +239,42 @@ namespace MGA.Playnite.Tests
                 AssertEqual(99, MgaGameMetadataFactory.CoverAssetId(game), "a deliberate cover choice was ignored");
             });
 
+            Test("a logo stands in when a game has no icon", () =>
+            {
+                // Measured on the owner's library: 119 games carry an icon and
+                // 222 a logo, but 239 carry one or the other. Without the
+                // fallback, most of the list would have no icon at all.
+                var withIcon = new GameDto
+                {
+                    Id = "game-1",
+                    Media = new List<MediaDto>
+                    {
+                        new MediaDto { AssetId = 7, Type = "logo" },
+                        new MediaDto { AssetId = 3, Type = "icon" }
+                    }
+                };
+                AssertEqual(3, MgaGameMetadataFactory.IconAssetId(withIcon), "a real icon was passed over for a logo");
+
+                var logoOnly = new GameDto
+                {
+                    Id = "game-2",
+                    Media = new List<MediaDto> { new MediaDto { AssetId = 7, Type = "logo" } }
+                };
+                AssertEqual(7, MgaGameMetadataFactory.IconAssetId(logoOnly), "a game with only a logo got no icon");
+            });
+
+            Test("the cover is never reused as the icon", () =>
+            {
+                // Playnite already shows the cover as the cover. Reusing tall
+                // box art would make every list row a second copy of it.
+                var coverOnly = new GameDto
+                {
+                    Id = "game-1",
+                    Media = new List<MediaDto> { new MediaDto { AssetId = 5, Type = "cover" } }
+                };
+                AssertEqual(0, MgaGameMetadataFactory.IconAssetId(coverOnly), "the cover was reused as the icon");
+            });
+
             Test("a game with no artwork imports anyway", () =>
             {
                 var game = new GameDto { Id = "game-1", Title = "Bare" };
