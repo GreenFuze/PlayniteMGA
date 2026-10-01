@@ -114,6 +114,8 @@ namespace MGA.Playnite.Api
             }
 
             var games = new List<GameDto>();
+            var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int? expectedTotal = null;
             var page = 0;
             while (true)
             {
@@ -122,19 +124,41 @@ namespace MGA.Playnite.Api
                 var path = BuildGamesPath(page, pageSize, hideLapsed);
                 var response = await GetAsync<ListGamesResponse>(path, "list your games", cancelToken)
                     .ConfigureAwait(false);
-                if (response?.Games == null || response.Games.Count == 0)
+                if (response == null || response.Games == null || response.Total < 0 ||
+                    (expectedTotal.HasValue && response.Total != expectedTotal.Value))
                 {
-                    break;
+                    throw IncompleteLibrary();
                 }
-
+                expectedTotal = response.Total;
+                if (response.Games.Count == 0 && games.Count != expectedTotal.Value)
+                {
+                    throw IncompleteLibrary();
+                }
+                foreach (var game in response.Games)
+                {
+                    if (game == null || string.IsNullOrWhiteSpace(game.Id) || !seenIds.Add(game.Id.Trim()))
+                    {
+                        throw IncompleteLibrary();
+                    }
+                }
                 games.AddRange(response.Games);
-                if (games.Count >= response.Total)
+                if (games.Count > expectedTotal.Value)
+                {
+                    throw IncompleteLibrary();
+                }
+                if (games.Count == expectedTotal.Value)
                 {
                     break;
                 }
                 page++;
             }
             return games;
+        }
+
+        private static MgaApiException IncompleteLibrary()
+        {
+            return new MgaApiException(MgaFailure.Malformed,
+                "MyGamesAnywhere returned an incomplete or changing library. No missing games will be removed; retry the library update.");
         }
 
         /// <summary>

@@ -62,6 +62,7 @@ namespace MGA.Playnite.Tests
             Console.WriteLine();
             Console.WriteLine("Server address — what a person can reasonably type");
             ServerUrlTests();
+            PagingTests.Run();
 
             Console.WriteLine();
             InstallTests.Run();

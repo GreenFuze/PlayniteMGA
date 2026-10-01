@@ -5,3 +5,8 @@ Version: 0.1.0
 Module: MGA.Playnite.dll
 Type: GameLibrary
 Icon: Resources\mga.png
+Links:
+  - Name: Source and documentation
+    Url: https://github.com/GreenFuze/PlayniteMGA
+  - Name: Releases
+    Url: https://github.com/GreenFuze/PlayniteMGA/releases

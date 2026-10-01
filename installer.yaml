@@ -1,0 +1,13 @@
+AddonId: MGA_02db01ef-50e6-49cd-8460-9ee06d324b74
+Packages:
+  - Version: 0.1.0
+    RequiredApiVersion: 6.16.0
+    ReleaseDate: 2026-10-02
+    PackageUrl: https://github.com/GreenFuze/PlayniteMGA/releases/download/v0.1.0/MyGamesAnywhere_0_1_0.pext
+    Changelog:
+      - Initial public release of the MyGamesAnywhere library integration.
+      - Sign in with an MGA profile and keep the scoped access key encrypted for your Windows account.
+      - Import metadata and artwork with stable game identities and subscription availability filtering.
+      - Download file-backed games with progress, cancellation, resume, and manifest verification.
+      - Hand Steam and Xbox games to their stores; preserve installed games and modified local files.
+      - Reject incomplete paginated libraries before reconciling missing games.

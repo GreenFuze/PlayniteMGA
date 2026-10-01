@@ -5,6 +5,7 @@
     <LangVersion>7.3</LangVersion>
     <Nullable>disable</Nullable>
     <AssemblyName>MGA.Playnite</AssemblyName>
+    <Version>0.1.0</Version>
     <RootNamespace>MGA.Playnite</RootNamespace>
     <Deterministic>true</Deterministic>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>

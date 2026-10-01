@@ -8,6 +8,16 @@ shares and the rest, works out which source files are the same game, and keeps t
 artwork and achievements. This plugin is one of its faces. Everything it shows comes from
 MGA's own library, so Playnite and the MGA console cannot drift apart.
 
+## Install
+
+Download `MyGamesAnywhere_0_1_0.pext` from the
+[latest release](https://github.com/GreenFuze/PlayniteMGA/releases/latest), open it
+with Playnite, and restart Playnite when prompted. Once the add-on database
+submission is accepted, the plugin will also appear under **Add-ons → Browse → Libraries**.
+
+Requires Playnite SDK 6.16.0 or later and MGA's scoped frontend API. Profile/password
+sign-in requires MGA 0.2.22 or later. The MGA server is installed separately.
+
 ## What it does today
 
 - Imports your whole MGA library, including games MGA knows about but cannot deliver
